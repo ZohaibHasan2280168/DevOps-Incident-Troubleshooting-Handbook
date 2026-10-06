@@ -1,0 +1,22 @@
+# Fixed implementation of INC-001 with user-defined bridge network & embedded DNS
+version: '3.8'
+
+networks:
+  smartdoc-net:
+    driver: bridge
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: demo-redis-fixed
+    networks:
+      - smartdoc-net
+    ports:
+      - "6379:6379"
+
+  backend-fixed:
+    image: alpine:latest
+    container_name: demo-backend-fixed
+    networks:
+      - smartdoc-net
+    command: ["sh", "-c", "sleep 2 && nc -z -v -w3 demo-redis-fixed 6379 && echo '>>> SUCCESS: Connected to demo-redis-fixed:6379 <<<'; sleep 3600"]

@@ -1,0 +1,15 @@
+# Reproduces Incident INC-001 (Isolated namespaces causing Connection Refused)
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: demo-redis
+    ports:
+      - "6379:6379"
+
+  # Backend fails if it expects redis at localhost
+  backend-broken:
+    image: alpine:latest
+    container_name: demo-backend-broken
+    command: ["sh", "-c", "nc -z -v -w3 localhost 6379 || echo '>>> ERROR 111: Connection Refused to localhost:6379 <<<'; sleep 3600"]
