@@ -1,0 +1,56 @@
+# ==============================================================================
+# Reference Manifest: deployment.fixed.yaml
+# Demonstrates proper StartupProbe + LivenessProbe to eliminate CrashLoopBackOff
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartdoc-backend-fixed
+  namespace: production
+  labels:
+    app: smartdoc-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: smartdoc-backend
+  template:
+    metadata:
+      labels:
+        app: smartdoc-backend
+    spec:
+      containers:
+        - name: backend
+          image: 479537131188.dkr.ecr.us-east-1.amazonaws.com/smartdoc-backend:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Startup probe gives up to 60s (12 * 5s) for DB migrations
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          # Liveness probe only takes over AFTER startup probe passes
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness probe ensures traffic only routes when DB is healthy
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 2
