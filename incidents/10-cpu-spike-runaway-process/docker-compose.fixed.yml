@@ -1,0 +1,47 @@
+# ==============================================================================
+# Production Docker Compose Configuration with Strict cgroup Limits
+# Incident: INC-010 (Host 100% CPU Saturation & Runaway Worker Thread Throttling)
+# ==============================================================================
+version: '3.8'
+
+services:
+  smartdoc-backend:
+    image: smartdoc-backend:v1.2.0
+    container_name: smartdoc-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKERS=4
+      - TIMEOUT_KEEP_ALIVE=75
+    deploy:
+      resources:
+        limits:
+          # On a 2-core host, cap container at 1.50 vCPUs (75% max host capacity).
+          # Linux Completely Fair Scheduler (CFS) enforces bandwidth quota,
+          # leaving 0.50 vCPUs permanently guaranteed for SSH, dockerd, and host daemons.
+          cpus: '1.50'
+          memory: 2048M
+        reservations:
+          # Guaranteed baseline allocation
+          cpus: '0.50'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  smartdoc-postgres:
+    image: postgres:16-alpine
+    container_name: smartdoc-postgres
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M

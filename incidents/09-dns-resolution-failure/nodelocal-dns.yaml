@@ -1,0 +1,82 @@
+# ==============================================================================
+# NodeLocal DNSCache DaemonSet Manifest (Production Configuration)
+# Incident: INC-009 (DNS Resolution Failures & CoreDNS Packet Throttling)
+# ==============================================================================
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-local-dns
+  namespace: kube-system
+  labels:
+    k8s-app: node-local-dns
+spec:
+  selector:
+    matchLabels:
+      k8s-app: node-local-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: node-local-dns
+      annotations:
+        prometheus.io/port: "9253"
+        prometheus.io/scrape: "true"
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: node-local-dns
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+      containers:
+        - name: node-cache
+          image: registry.k8s.io/dns/k8s-dns-node-cache:1.22.28
+          resources:
+            requests:
+              cpu: 50m
+              memory: 30Mi
+            limits:
+              memory: 100Mi
+          args:
+            - -localip
+            - 169.254.20.10
+            - -conf
+            - /etc/Corefile
+            - -upstreamsvc
+            - kube-dns-upstream
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 53
+              name: dns
+              protocol: UDP
+            - containerPort: 53
+              name: dns-tcp
+              protocol: TCP
+            - containerPort: 9253
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /run/xtables.lock
+              name: xtables-lock
+            - mountPath: /etc/coredns
+              name: config-volume
+            - mountPath: /etc/kube-dns
+              name: kube-dns-config
+      volumes:
+        - name: xtables-lock
+          hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate
+        - name: config-volume
+          configMap:
+            name: node-local-dns
+            items:
+              - key: Corefile
+                path: Corefile
+        - name: kube-dns-config
+          configMap:
+            name: kube-dns
+            optional: true
